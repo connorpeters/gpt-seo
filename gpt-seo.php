@@ -13,19 +13,28 @@
 
 require_once 'page-settings.php';
 require_once 'post-snippet.php';
-require_once 'cron.php';
 require_once 'vendor/autoload.php';
 
 /**
  * Activate the plugin and init
  */
 function gptseo_activate() { 
-	gptseo_init(); 
+	gptseo_init();
+
+	// Default email to admin_email
+	$options = get_option( 'gptseo_options' );
+    if(!isset($options["gptseo_field_email"])){
+		$options = array("gptseo_field_email" => get_bloginfo('admin_email'));
+		update_option("gptseo_options", $options);
+    } elseif($options["gptseo_field_email"] == "") {
+		$options["gptseo_field_email"] = get_bloginfo('admin_email');
+		update_option("gptseo_options", $options);
+    }
 
 	// Init cron
-	if ( ! wp_next_scheduled( 'gptseo_cron_hook' ) ) {
-		wp_schedule_event( time(), 'weekly', 'gptseo_cron_hook' );
-	}
+	// if ( ! wp_next_scheduled( 'gptseo_cron_hook' ) ) {
+	// 	wp_schedule_event( time(), 'weekly', 'gptseo_cron_hook' );
+	// }
 
 	// Clear the permalinks after the post type has been registered.
 	flush_rewrite_rules(); 
@@ -76,6 +85,15 @@ function gptseo_init() {
 } 
 add_action( 'init', 'gptseo_init' );
 
+function gptseo_enqueue($hook) {
+    $cpt = 'snippet';
+    $screen = get_current_screen();
+    if( ( $hook == 'toplevel_page_gptseo' || in_array($hook, array('post.php', 'post-new.php') ) && is_object( $screen ) && $cpt == $screen->post_type) ){
+        wp_register_style('options_page_style', plugin_dir_url( __FILE__ ) . 'style.css');
+        wp_enqueue_style('options_page_style');
+    }
+}
+add_action( 'admin_enqueue_scripts', 'gptseo_enqueue' );
 
 function gptseo_display_snippet_shortcode( $atts = array(), $content = null, $tag = '' ) {
 	$atts = array_change_key_case( (array) $atts, CASE_LOWER );
@@ -99,8 +117,16 @@ function gptseo_display_snippet_shortcode( $atts = array(), $content = null, $ta
 register_deactivation_hook(__FILE__, 'gptseo_deactivate');
 function gptseo_deactivate() { 
 	// Remove crons
-	$timestamp = wp_next_scheduled( 'gptseo_cron_hook' );
-	wp_unschedule_event( $timestamp, 'gptseo_cron_hook' );
+	$posts = get_posts([
+		'post_type' => 'snippet',
+		'numberposts' => -1
+	]);
+
+	foreach($posts as $post) {
+		$args = array("post_id" => $post->ID);
+		wp_clear_scheduled_hook( 'gptseo_cron_hook', $args );
+		error_log("Cleared cron for:" . $post->ID);
+	}
 
 	unregister_post_type( 'snippet' );
 

@@ -1,4 +1,43 @@
 <?php
+function gptseo_cron_exec($post_id){
+	error_log("CRONNNED: " . $post_id);
+	$post = get_post($post_id);
+	$new_snippet = gptseo_rewrite_content($post_id);
+	$old_snippet = $post->post_content;
+
+	// Send email
+	$to = get_option('gptseo_options')['gptseo_field_email'];
+	$site_name = get_bloginfo("name");
+	$headers = array('Content-Type: text/html; charset=UTF-8');
+	$subject = $site_name . " - New SEO Snippet";
+
+	$nonce = wp_create_nonce( 'quick-publish-action' ); 
+	$link = admin_url( "edit.php?post_type=snippet&update_id=$post_id&_wpnonce=$nonce" );
+
+	$body = "<p>The new snippet:<br />" . $new_snippet . "</p><p>The old snippet:<br />" . $old_snippet . "</p><p>Approve this snippet now: " . $link . "</p>";
+
+	wp_mail( $to, $subject, $body, $headers );
+}
+
+// Quicklink to update a snippet from draft to publish
+// Also schedules another cron via the transition_post_status action (gptseo_approve_snippet)
+add_action( 'load-edit.php', function() {
+    if ( isset( $_REQUEST['update_id'] ) ) {
+        $my_post = array();
+        $my_post['ID'] = $_REQUEST['update_id'];
+        $my_post['post_status'] = 'publish';
+        wp_update_post( $my_post );
+		?>
+		<div class="notice notice-success is-dismissible"> 
+			<p><strong>Snippet has been published.</strong></p>
+			<button type="button" class="notice-dismiss">
+				<span class="screen-reader-text">Dismiss this notice.</span>
+			</button>
+		</div>
+		<?php
+    }
+});
+
 function gptseo_register_meta_boxes() {
 	add_meta_box( 'meta-box-id', 'GPT SEO Options', 'gptseo_my_display_callback', 'snippet', 'normal', 'high' );
 
@@ -38,6 +77,12 @@ function gptseo_approve_snippet( $new_status, $old_status, $post ) {
 			);
 			wp_update_post( $update_post );
 		}
+
+		// Schedule cron
+		$args = array('post_id' => $post->ID);
+		if ( ! wp_next_scheduled( 'gptseo_cron_hook', $args ) ) {
+			wp_schedule_single_event( time() + WEEK_IN_SECONDS, 'gptseo_cron_hook', $args );
+		}
 	}
 }
 add_action( 'transition_post_status', 'gptseo_approve_snippet', 10, 3 );
@@ -64,21 +109,22 @@ function gptseo_my_display_callback( $post ) {
 	<script>
 		jQuery(document).ready(function(){
 			jQuery('#generate-snippet').click(function(){
-				var clickBtnValue = jQuery(this).val();
-				console.log(clickBtnValue)
-				jQuery.post("/wp-admin/admin-ajax.php", {
-					gptseo_nonce: "<?php echo wp_create_nonce(); ?>",
-					action: "gptseo_ajax_generate",
-					post_id: <?php echo $post->ID; ?>,
-					gptseo_instructions: jQuery("input[type=text][name=gptseo_instructions]").val(),
-					gptseo_reference: jQuery("input[type=text][name=gptseo_reference]").val()
+				if(jQuery("input[type=text][name=gptseo_reference]").val() !== '') {
+					jQuery.post("/wp-admin/admin-ajax.php", {
+						gptseo_nonce: "<?php echo wp_create_nonce(); ?>",
+						action: "gptseo_ajax_generate",
+						post_id: <?php echo $post->ID; ?>,
+						gptseo_instructions: jQuery("input[type=text][name=gptseo_instructions]").val(),
+						gptseo_reference: jQuery("input[type=text][name=gptseo_reference]").val()
 					}, function(data) {
 						alert("Successfully generated new SEO snippet");
                         $res = data['data'];
                         jQuery("input[type=text][name=gptseo_seo_result]").val($res);
                         console.log(data);
-					}
-				);
+					});
+				} else {
+					alert("Reference text must not be update to generate a snippet")
+				}
 			});
 		});
 	</script>
@@ -95,8 +141,6 @@ function gptseo_ajax_generate(){
     gptseo_save_meta_box($_POST['post_id']);
     $res = gptseo_rewrite_content($_POST['post_id']);
     wp_send_json_success($res);
-    // wp_die(); // ajax call must die to avoid trailing 0 in your response
-    // return "data";
 }
 add_action( "wp_ajax_gptseo_ajax_generate", "gptseo_ajax_generate" );
 

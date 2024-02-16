@@ -26,13 +26,13 @@ function gptseo_settings_init() {
 	);
 
 	add_settings_field(
-		'gptseo_field_cron_schedule',
-		__( 'Update Regularity', 'gptseo' ),
-		'gptseo_field_cron_schedule_cb',
+		'gptseo_field_email_cb',
+		__( 'Admin Email', 'gptseo' ),
+		'gptseo_field_email_cb',
 		'gptseo',
 		'gptseo_section_developers',
 		array(
-			'label_for'         => 'gptseo_field_cron_schedule',
+			'label_for'         => 'gptseo_field_email',
 			'class'             => 'gptseo_row',
 		)
 	);
@@ -67,7 +67,7 @@ function gptseo_field_api_key_cb( $args ) {
 	<?php
 }
 
-function gptseo_field_cron_schedule_cb( $args ) {
+function gptseo_field_email_cb( $args ) {
 	// Get the value of the setting we've registered with register_setting()
 	$options = get_option( 'gptseo_options' );
     $key = "";
@@ -92,17 +92,6 @@ function gptseo_options_page() {
 	);
 }
 add_action( 'admin_menu', 'gptseo_options_page' );
-
-function gptseo_enqueue($hook) {
-    $cpt = 'snippet';
-    $screen = get_current_screen();
-    if( ( $hook == 'toplevel_page_gptseo' || in_array($hook, array('post.php', 'post-new.php') ) && is_object( $screen ) && $cpt == $screen->post_type) ){
-        wp_register_style('options_page_style', plugin_dir_url( __FILE__ ) . 'style.css');
-        wp_enqueue_style('options_page_style');
-    }
-}
-add_action( 'admin_enqueue_scripts', 'gptseo_enqueue' );
-
 
 /**
  * Top level menu callback function
