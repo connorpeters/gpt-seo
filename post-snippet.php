@@ -81,7 +81,7 @@ function gptseo_approve_snippet( $new_status, $old_status, $post ) {
 		// Schedule cron
 		$args = array('post_id' => $post->ID);
 		if ( ! wp_next_scheduled( 'gptseo_cron_hook', $args ) ) {
-			wp_schedule_single_event( time() + WEEK_IN_SECONDS, 'gptseo_cron_hook', $args );
+			wp_schedule_single_event( time() + DAY_IN_SECONDS, 'gptseo_cron_hook', $args );
 		}
 	}
 }

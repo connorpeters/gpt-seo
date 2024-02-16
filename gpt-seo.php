@@ -4,8 +4,8 @@
  * Plugin URI:        https:/locke.id
  * Description:       Configure GPT4 to automatically rewrite specific content in your website on a regular basis to please Google and rank number 1.
  * Version:           1.0
- * Requires at least: 5.2
- * Requires PHP:      7.2
+ * Requires at least: 6.3
+ * Requires PHP:      8.1
  * Author:            Connor Peters
  * Author URI:        https://locke.id
  * Text Domain:       gptseo
@@ -30,11 +30,6 @@ function gptseo_activate() {
 		$options["gptseo_field_email"] = get_bloginfo('admin_email');
 		update_option("gptseo_options", $options);
     }
-
-	// Init cron
-	// if ( ! wp_next_scheduled( 'gptseo_cron_hook' ) ) {
-	// 	wp_schedule_event( time(), 'weekly', 'gptseo_cron_hook' );
-	// }
 
 	// Clear the permalinks after the post type has been registered.
 	flush_rewrite_rules(); 
@@ -111,7 +106,7 @@ function gptseo_display_snippet_shortcode( $atts = array(), $content = null, $ta
 		return "No snippet found for this ID";
 	}
 
-	return esc_html( $post->post_content );
+	return $post->post_content;
 }
 
 register_deactivation_hook(__FILE__, 'gptseo_deactivate');
